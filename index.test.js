@@ -72,6 +72,81 @@ describe('calculateEnergyUsageSimple', () => {
       80 - 0 + (1440 - 656)
     );
   });
+
+  it('should calculate correctly when the appliance is off the whole time', () => {
+    const usageProfile4 = {
+      initial: 'off',
+      events: [],
+    };
+    expect(calculateEnergyUsageSimple(usageProfile4)).toEqual(0);
+  });
+
+
+  it('should calculate correctly when the last event occurs at the last minute', () => {
+    const usageProfile7 = {
+      initial: 'on',
+      events: [{ timestamp: 1439, state: 'off' }],
+    };
+    expect(calculateEnergyUsageSimple(usageProfile7)).toEqual(1439);
+  });
+
+  it('should calculate correctly when events occur at the same timestamp', () => {
+    const usageProfile8 = {
+      initial: 'on',
+      events: [
+        { timestamp: 300, state: 'off' },
+        { timestamp: 300, state: 'on' },
+        { timestamp: 900, state: 'off' },
+      ],
+    };
+    expect(calculateEnergyUsageSimple(usageProfile8)).toEqual(
+      300 + (1440 - 900)
+    );
+  });
+
+  it('should calculate correctly with multiple on-off transitions', () => {
+    const usageProfile9 = {
+      initial: 'off',
+      events: [
+        { timestamp: 100, state: 'on' },
+        { timestamp: 150, state: 'off' },
+        { timestamp: 200, state: 'on' },
+        { timestamp: 250, state: 'off' },
+        { timestamp: 300, state: 'on' },
+        { timestamp: 350, state: 'off' },
+      ],
+    };
+    expect(calculateEnergyUsageSimple(usageProfile9)).toEqual(
+      150 - 100 + (250 - 200) + (350 - 300)
+    );
+  });
+
+  it('should calculate correctly when the appliance is turned on with the last event', () => {
+    const usageProfile10 = {
+      initial: 'off',
+      events: [{ timestamp: 1000, state: 'on' }],
+    };
+    expect(calculateEnergyUsageSimple(usageProfile10)).toEqual(1440 - 1000);
+  });
+
+  it('should handle invalid initial state gracefully', () => {
+    const usageProfile11 = {
+      initial: 'invalid-state',
+      events: [],
+    };
+    expect(calculateEnergyUsageSimple(usageProfile11)).toEqual(0);
+  });
+
+  it('should handle negative or invalid timestamps gracefully', () => {
+    const usageProfile12 = {
+      initial: 'off',
+      events: [
+        { timestamp: -10, state: 'on' },
+        { timestamp: 500, state: 'off' },
+      ],
+    };
+    expect(calculateEnergyUsageSimple(usageProfile12)).toEqual(0);
+  });
 });
 
 // Part 2

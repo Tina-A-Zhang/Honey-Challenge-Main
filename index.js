@@ -36,8 +36,41 @@ const MAX_IN_PERIOD = 1440;
  * ```
  */
 
-const calculateEnergyUsageSimple = (profile) => {}
+const calculateEnergyUsageSimple = (profile) => {
+  if (
+    !profile ||
+    !Array.isArray(profile.events) ||
+    typeof profile.initial !== 'string'
+  ) {
+    return 0;
+  }
 
+  let totalEnergy = 0;
+  let previousTimestamp = 0;
+  let isOn = profile.initial === 'on';
+
+  profile.events.forEach((event) => {
+    if (
+      typeof event.timestamp !== 'number' ||
+      !['on', 'off'].includes(event.state)
+    ) {
+      return 0;
+    }
+
+    if (isOn) {
+      totalEnergy += event.timestamp - previousTimestamp;
+    }
+
+    isOn = event.state === 'on';
+    previousTimestamp = event.timestamp;
+  });
+
+  if (isOn) {
+    totalEnergy += MAX_IN_PERIOD - previousTimestamp;
+  }
+
+  return totalEnergy;
+};
 /**
  * PART 2
  *
