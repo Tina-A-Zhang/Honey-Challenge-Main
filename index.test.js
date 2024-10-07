@@ -183,7 +183,6 @@ describe("calculateEnergyUsageSimple", () => {
     // Test with various non-object types
     const invalidProfiles = [null, undefined, 123, "string", [], true];
     invalidProfiles.forEach((invalidProfile) => {
-      console.log(invalidProfile);
       expect(() => calculateEnergyUsageSimple(invalidProfile)).toThrow(
         INVALID_PROFILE_ERROR
       );
