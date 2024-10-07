@@ -8,7 +8,7 @@ const {
   INVALID_EVENTS_ERROR,
   INVALID_EVENT_TIMESTAMP_ERROR,
   INVALID_PROFILE_ERROR,
-  INVALID_STATE_ERROR,
+  getInvalidStateError,
 } = require("./index");
 
 // Part 1
@@ -142,7 +142,7 @@ describe("calculateEnergyUsageSimple", () => {
       events: [],
     };
     expect(() => calculateEnergySavings(usageProfile11)).toThrow(
-      INVALID_STATE_ERROR(VALID_STATES)
+      getInvalidStateError(VALID_STATES)
     );
   });
 
@@ -175,7 +175,7 @@ describe("calculateEnergyUsageSimple", () => {
       events: [{ timestamp: 500, state: "invalid-state" }],
     };
     expect(() => calculateEnergyUsageSimple(usageProfile)).toThrow(
-      INVALID_STATE_ERROR(VALID_STATES_SIMPLE)
+      getInvalidStateError(VALID_STATES_SIMPLE)
     );
   });
 
@@ -343,7 +343,7 @@ describe("calculateEnergySavings", () => {
     };
 
     expect(() => calculateEnergySavings(usageProfile11)).toThrow(
-      INVALID_STATE_ERROR(VALID_STATES)
+      getInvalidStateError(VALID_STATES)
     );
   });
 
@@ -367,7 +367,7 @@ describe("calculateEnergySavings", () => {
       events: [],
     };
     expect(() => calculateEnergySavings(usageProfile)).toThrow(
-      INVALID_STATE_ERROR(VALID_STATES)
+      getInvalidStateError(VALID_STATES)
     );
   });
 });
@@ -595,14 +595,14 @@ describe("calculateEnergyUsageForDay", () => {
   it("should throw an error for invalid month profile input", () => {
     expect(() =>
       calculateEnergyUsageForDay({ initial: "invalid", events: [] }, 3)
-    ).toThrow(INVALID_STATE_ERROR(VALID_STATES_SIMPLE));
+    ).toThrow(getInvalidStateError(VALID_STATES_SIMPLE));
 
     expect(() => calculateEnergyUsageForDay({ initial: "on" }, 3)).toThrow(
       INVALID_EVENTS_ERROR
     );
 
     expect(() => calculateEnergyUsageForDay({ events: [] }, 3)).toThrow(
-      INVALID_STATE_ERROR(VALID_STATES_SIMPLE)
+      getInvalidStateError(VALID_STATES_SIMPLE)
     );
   });
 });

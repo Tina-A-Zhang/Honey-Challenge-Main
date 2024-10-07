@@ -11,11 +11,11 @@ const INVALID_EVENT_TIMESTAMP_ERROR =
   "Invalid event: timestamp must be a number between 0 and 1439.";
 const INVALID_EVENTS_ERROR =
   "Invalid profile: must include an array of events.";
-const INVALID_STATE_ERROR = (validStates) =>
+const getInvalidStateError = (validStates) =>
   `Invalid event: state must be one of ${validStates.join(", ")}.`;
 
 // Validation for individual events
-const isEventValid = (event, validStates) => {
+const validateEvent = (event, validStates) => {
   if (
     typeof event.timestamp !== "number" ||
     event.timestamp < 0 ||
@@ -24,13 +24,13 @@ const isEventValid = (event, validStates) => {
     throw new Error(INVALID_EVENT_TIMESTAMP_ERROR);
   }
   if (!validStates.includes(event.state)) {
-    throw new Error(INVALID_STATE_ERROR(validStates));
+    throw new Error(getInvalidStateError(validStates));
   }
   return true;
 };
 
 // Validation for the overall profile
-const isProfileValid = (profile, validStates) => {
+const validateProfile = (profile, validStates) => {
   if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
     throw new Error(INVALID_PROFILE_ERROR);
   }
@@ -40,7 +40,7 @@ const isProfileValid = (profile, validStates) => {
   }
 
   if (!validStates.includes(profile.initial)) {
-    throw new Error(INVALID_STATE_ERROR(validStates));
+    throw new Error(getInvalidStateError(validStates));
   }
 
   return true;
@@ -66,7 +66,7 @@ const isProfileValid = (profile, validStates) => {
  * @throws Will throw an error if `profile` is invalid or contains invalid events.
  */
 const calculateEnergyUsageSimple = (profile) => {
-  isProfileValid(profile, VALID_STATES_SIMPLE);
+  validateProfile(profile, VALID_STATES_SIMPLE);
 
   let totalEnergy = 0;
   let previousEventTimestamp = 0;
@@ -74,7 +74,7 @@ const calculateEnergyUsageSimple = (profile) => {
   let previousStateWasOn = profile.initial === "on";
 
   for (const event of profile.events) {
-    isEventValid(event, VALID_STATES_SIMPLE);
+    validateEvent(event, VALID_STATES_SIMPLE);
 
     // If the appliance was "on" prior to this event, add the time since the last event
     if (previousStateWasOn) {
@@ -110,7 +110,7 @@ const calculateEnergyUsageSimple = (profile) => {
  * @throws Error if profile or events are invalid.
  */
 const calculateEnergySavings = (profile) => {
-  isProfileValid(profile, VALID_STATES);
+  validateProfile(profile, VALID_STATES);
 
   let totalEnergySaved = 0;
   let previousStateWasOn = profile.initial === "on";
@@ -118,14 +118,14 @@ const calculateEnergySavings = (profile) => {
   let autoOffTimestamp = 0;
 
   for (const event of profile.events) {
-    isEventValid(event, VALID_STATES);
+    validateEvent(event, VALID_STATES);
 
+    // Appliance turns back "on" after an auto-off, so calculate saved energy
     if (autoOffWasTriggered && event.state === "on") {
-      // Appliance turns back "on" after an auto-off, so calculate saved energy
       totalEnergySaved += event.timestamp - autoOffTimestamp;
       autoOffWasTriggered = false;
-    } else if (event.state === "auto-off" && previousStateWasOn) {
       // Start tracking energy savings when auto-off is triggered
+    } else if (event.state === "auto-off" && previousStateWasOn) {
       autoOffWasTriggered = true;
       autoOffTimestamp = event.timestamp;
     }
@@ -160,12 +160,13 @@ const validateDay = (day) => {
 /**
  * Calculates the energy usage for a specific day based on a timestamp profile for the month.
  *
- * This function slices out the relevant events for the specified day from `monthUsageProfile`
- * and calculates total energy usage based on those events.
+ * This function iterates through all events only once to:
+ * - Determine the initial state for the specified day
+ * - Collect relevant events within the day's time range, adjusting timestamps
  *
  * Edge Cases:
  * - If the initial state is "on" and no events exist within the day, assumes full-day usage.
- * - Multiple events at day boundaries are handled gracefully by filtering and mapping separately.
+ * - Handles events on day boundaries efficiently.
  *
  * @param {Object} monthUsageProfile - Profile with an initial state and list of timestamped events.
  * @param {number} day - Day of the month (1 to 365).
@@ -173,26 +174,31 @@ const validateDay = (day) => {
  * @throws Error if day is invalid or monthUsageProfile is incorrectly structured.
  */
 const calculateEnergyUsageForDay = (monthUsageProfile, day) => {
-  isProfileValid(monthUsageProfile, VALID_STATES_SIMPLE);
+  validateProfile(monthUsageProfile, VALID_STATES_SIMPLE);
   validateDay(day);
 
   const dayStart = (day - 1) * MAX_IN_PERIOD;
   const dayEnd = day * MAX_IN_PERIOD - 1;
 
-  // Determine initial state for the start of the specified day
   let initialState = monthUsageProfile.initial;
-  for (const event of monthUsageProfile.events) {
-    if (event.timestamp >= dayStart) break;
-    initialState = event.state;
-  }
+  const dayEvents = [];
 
-  // Extract events that fall within the specific day, adjusting timestamps
-  const dayEvents = monthUsageProfile.events
-    .filter((event) => event.timestamp >= dayStart && event.timestamp <= dayEnd)
-    .map((event) => ({
-      state: event.state,
-      timestamp: event.timestamp - dayStart,
-    }));
+  // Iterate through events to set initial state and filter relevant day events
+  for (const event of monthUsageProfile.events) {
+    if (event.timestamp < dayStart) {
+      // Update initial state based on events prior to the day's start
+      initialState = event.state;
+    } else if (event.timestamp <= dayEnd) {
+      // Adjust timestamp for events within the day's range and add to dayEvents
+      dayEvents.push({
+        state: event.state,
+        timestamp: event.timestamp - dayStart,
+      });
+    } else {
+      // Break early as remaining events exceed the day's range
+      break;
+    }
+  }
 
   return calculateEnergyUsageSimple({
     initial: initialState,
@@ -203,7 +209,7 @@ const calculateEnergyUsageForDay = (monthUsageProfile, day) => {
 module.exports = {
   INVALID_PROFILE_ERROR,
   INVALID_EVENTS_ERROR,
-  INVALID_STATE_ERROR,
+  getInvalidStateError,
   calculateEnergyUsageSimple,
   calculateEnergySavings,
   calculateEnergyUsageForDay,
