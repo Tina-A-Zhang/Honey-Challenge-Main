@@ -1,8 +1,49 @@
-/* The maximum number of minutes in a period (a day) */
-
+// Constants for the maximum number of minutes in a day
 const MAX_IN_PERIOD = 1440;
+
+// Valid states for simple and auto-off cases
 const VALID_STATES_SIMPLE = ["on", "off"];
 const VALID_STATES = ["on", "off", "auto-off"];
+// error messages
+const INVALID_PROFILE_ERROR = "Invalid profile: profile must be an object.";
+const INVALID_EVENT_TIMESTAMP_ERROR =
+  "Invalid event: timestamp must be a number between 0 and 1439.";
+const INVALID_EVENTS_ERROR =
+  "Invalid profile: must include an array of events.";
+const INVALID_STATE_ERROR = (validStates) =>
+  `Invalid event: state must be one of ${validStates.join(", ")}.`;
+
+// Validation for individual events
+const isEventValid = (event, validStates) => {
+  if (
+    typeof event.timestamp !== "number" ||
+    event.timestamp < 0 ||
+    event.timestamp >= MAX_IN_PERIOD
+  ) {
+    throw new Error(INVALID_EVENT_TIMESTAMP_ERROR);
+  }
+  if (!validStates.includes(event.state)) {
+    throw new Error(INVALID_STATE_ERROR(validStates));
+  }
+  return true;
+};
+
+// Validation for the overall profile
+const isProfileValid = (profile, validStates) => {
+  if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
+    throw new Error(INVALID_PROFILE_ERROR);
+  }
+
+  if (!Array.isArray(profile.events)) {
+    throw new Error(INVALID_EVENTS_ERROR);
+  }
+
+  if (!validStates.includes(profile.initial)) {
+    throw new Error(INVALID_STATE_ERROR(validStates));
+  }
+
+  return true;
+};
 
 /**
  * PART 1
@@ -38,43 +79,51 @@ const VALID_STATES = ["on", "off", "auto-off"];
  * ```
  */
 
-// Validation for individual events
-const isEventValid = (event, validStates) =>
-  typeof event.timestamp === "number" &&
-  validStates.includes(event.state) &&
-  event.timestamp >= 0 &&
-  event.timestamp <= MAX_IN_PERIOD;
-
-// Validation for the overall profile
-const isProfileValid = (profile, validStates) =>
-  profile &&
-  Array.isArray(profile.events) &&
-  validStates.includes(profile.initial);
-
+/**
+ * Calculates the total energy usage for an appliance based on its on/off events over a day.
+ *
+ * The function takes a profile object containing an initial state and a series of events
+ * with timestamps and states. It calculates the cumulative "on" time for the appliance
+ * by iterating through each event and adding the duration of each "on" period.
+ *
+ * Edge Cases:
+ * - If the appliance starts "on" and has no events, it will consume energy for the entire day.
+ * - If there are duplicate events with the same timestamp, each event is processed independently,
+ *   but the timestamp difference will be zero, resulting in no additional energy usage for that duplicate.
+ * - If the last event leaves the appliance "on," the function adds the remaining time in the day to the total.
+ *
+ * @param {Object} profile - The usage profile, containing:
+ *   - {string} initial - Initial state ("on" or "off").
+ *   - {Array} events - Array of event objects with `timestamp` (number) and `state` (string) properties.
+ * @returns {number} Total energy usage in minutes for the day.
+ * @throws Will throw an error if `profile` is invalid or contains invalid events.
+ */
 const calculateEnergyUsageSimple = (profile) => {
-  if (!isProfileValid(profile, VALID_STATES_SIMPLE)) {
-    return undefined;
-  }
+  // Validate profile structure and values
+  isProfileValid(profile, VALID_STATES_SIMPLE);
 
   let totalEnergy = 0;
-  let previousTimestamp = 0;
-  let isOn = profile.initial === "on";
+  let previousEventTimestamp = 0;
+  // Appliance starts in the given initial state
+  let previousStateWasOn = profile.initial === "on";
 
-  for (let event of profile.events) {
-    if (!isEventValid(event, VALID_STATES_SIMPLE)) {
-      return undefined;
+  // Iterate through events to calculate total "on" time
+  for (const event of profile.events) {
+    isEventValid(event, VALID_STATES_SIMPLE);
+
+    // If the appliance was "on" prior to this event, add the time since the last event
+    if (previousStateWasOn) {
+      totalEnergy += event.timestamp - previousEventTimestamp;
     }
 
-    if (isOn) {
-      totalEnergy += event.timestamp - previousTimestamp;
-    }
-
-    isOn = event.state === "on";
-    previousTimestamp = event.timestamp;
+    // Update state and timestamp for the next cycle
+    previousStateWasOn = event.state === "on";
+    previousEventTimestamp = event.timestamp;
   }
 
-  if (isOn) {
-    totalEnergy += MAX_IN_PERIOD - previousTimestamp;
+  // If appliance remains "on" after the last event, add the remaining minutes until the end of the day
+  if (previousStateWasOn) {
+    totalEnergy += MAX_IN_PERIOD - previousEventTimestamp;
   }
 
   return totalEnergy;
@@ -112,35 +161,47 @@ const calculateEnergyUsageSimple = (profile) => {
  * and not manual intervention.
  */
 
+/**
+ * Calculates the energy saved by the appliance due to automatic "auto-off" events.
+ *
+ * This function tracks energy savings for periods when the appliance is turned off
+ * automatically (via 'auto-off') but excludes savings from manual 'off' events.
+ *
+ * Edge Cases:
+ * - If the appliance is initially in "auto-off," savings begin from the start of the day.
+ * - If "auto-off" is followed by manual "off" events, only the original auto-off savings count.
+ * - If the appliance remains in "auto-off" state at the end of the day, remaining minutes are counted as saved.
+ *
+ * @param {Object} profile - Usage profile with initial state and list of events.
+ * @returns {number} Total energy saved in minutes for the day due to auto-off events.
+ * @throws Error if profile or events are invalid.
+ */
 const calculateEnergySavings = (profile) => {
-  if (!isProfileValid(profile, VALID_STATES)) {
-    return undefined;
-  }
+  isProfileValid(profile, VALID_STATES);
 
   let totalEnergySaved = 0;
-  let isOn = profile.initial === "on";
-  let autoOffTriggered = profile.initial === "auto-off";
+  let previousStateWasOn = profile.initial === "on";
+  let autoOffWasTriggered = profile.initial === "auto-off";
   let autoOffTimestamp = 0;
 
-  for (let event of profile.events) {
-    if (!isEventValid(event, VALID_STATES)) {
-      return undefined;
-    }
+  for (const event of profile.events) {
+    isEventValid(event, VALID_STATES);
 
-    if (autoOffTriggered && event.state === "on") {
+    if (autoOffWasTriggered && event.state === "on") {
+      // Appliance turns back "on" after an auto-off, so calculate saved energy
       totalEnergySaved += event.timestamp - autoOffTimestamp;
-      autoOffTriggered = false;
-    }
-
-    if (event.state === "auto-off" && isOn) {
-      autoOffTriggered = true;
+      autoOffWasTriggered = false;
+    } else if (event.state === "auto-off" && previousStateWasOn) {
+      // Start tracking energy savings when auto-off is triggered
+      autoOffWasTriggered = true;
       autoOffTimestamp = event.timestamp;
     }
-
-    isOn = event.state === "on";
+    // If the state is "off," no action is required
+    previousStateWasOn = event.state === "on";
   }
 
-  if (autoOffTriggered) {
+  // If appliance remains in "auto-off" at day's end, add remaining saved time
+  if (autoOffWasTriggered) {
     totalEnergySaved += MAX_IN_PERIOD - autoOffTimestamp;
   }
 
@@ -174,43 +235,53 @@ const calculateEnergySavings = (profile) => {
  */
 
 const isInteger = (number) => Number.isInteger(number);
+
 // Validate the day input
 const validateDay = (day) => {
   if (!isInteger(day)) {
-    throw new Error("must be an integer");
+    throw new Error("Day must be an integer.");
   }
   if (day < 1 || day > 365) {
     throw new Error("day out of range");
   }
 };
 
-// Calculate the initial state for a specific day
-const getInitialStateForDay = (monthUsageProfile, dayStart) => {
-  let initialState = monthUsageProfile.initial;
-  for (let event of monthUsageProfile.events) {
-    if (event.timestamp >= dayStart) break;
-    initialState = event.state;
-  }
-  return initialState;
-};
-
+/**
+ * Calculates the energy usage for a specific day based on a timestamp profile for the month.
+ *
+ * This function slices out the relevant events for the specified day from `monthUsageProfile`
+ * and calculates total energy usage based on those events.
+ *
+ * Edge Cases:
+ * - If the initial state is "on" and no events exist within the day, assumes full-day usage.
+ * - Multiple events at day boundaries are handled gracefully by filtering and mapping separately.
+ *
+ * @param {Object} monthUsageProfile - Profile with an initial state and list of timestamped events.
+ * @param {number} day - Day of the month (1 to 365).
+ * @returns {number} Total energy usage in minutes for the specified day.
+ * @throws Error if day is invalid or monthUsageProfile is incorrectly structured.
+ */
 const calculateEnergyUsageForDay = (monthUsageProfile, day) => {
-  if (!isProfileValid(monthUsageProfile, VALID_STATES_SIMPLE)) {
-    return undefined;
-  }
+  isProfileValid(monthUsageProfile, VALID_STATES_SIMPLE);
   validateDay(day);
 
   const dayStart = (day - 1) * MAX_IN_PERIOD;
   const dayEnd = day * MAX_IN_PERIOD - 1;
 
+  // Determine initial state for the start of the specified day
+  let initialState = monthUsageProfile.initial;
+  for (const event of monthUsageProfile.events) {
+    if (event.timestamp >= dayStart) break;
+    initialState = event.state;
+  }
+
+  // Extract events that fall within the specific day, adjusting timestamps
   const dayEvents = monthUsageProfile.events
     .filter((event) => event.timestamp >= dayStart && event.timestamp <= dayEnd)
     .map((event) => ({
       state: event.state,
       timestamp: event.timestamp - dayStart,
     }));
-
-  const initialState = getInitialStateForDay(monthUsageProfile, dayStart);
 
   return calculateEnergyUsageSimple({
     initial: initialState,
@@ -219,8 +290,13 @@ const calculateEnergyUsageForDay = (monthUsageProfile, day) => {
 };
 
 module.exports = {
+  INVALID_PROFILE_ERROR,
+  INVALID_EVENTS_ERROR,
+  INVALID_STATE_ERROR,
   calculateEnergyUsageSimple,
   calculateEnergySavings,
   calculateEnergyUsageForDay,
+  VALID_STATES,
+  VALID_STATES_SIMPLE,
   MAX_IN_PERIOD,
 };

@@ -130,15 +130,17 @@ describe("calculateEnergyUsageSimple", () => {
     );
   });
 
-  it("should handle invalid initial state gracefully", () => {
+  it("should throw an error for an invalid initial state", () => {
     const usageProfile11 = {
       initial: "invalid-state",
       events: [],
     };
-    expect(calculateEnergyUsageSimple(usageProfile11)).toEqual(undefined);
+    expect(() => calculateEnergySavings(usageProfile11)).toThrow(
+      "Invalid profile: initial state must be one of on, off, auto-off."
+    );
   });
 
-  it("should handle negative or invalid timestamps gracefully", () => {
+  it("should throw an error for negative or invalid timestamps", () => {
     const usageProfile12 = {
       initial: "off",
       events: [
@@ -146,7 +148,9 @@ describe("calculateEnergyUsageSimple", () => {
         { timestamp: 500, state: "off" },
       ],
     };
-    expect(calculateEnergyUsageSimple(usageProfile12)).toEqual(undefined);
+    expect(() => calculateEnergyUsageSimple(usageProfile12)).toThrow(
+      "Invalid event: timestamp must be a number between 0 and 1440."
+    );
   });
 });
 
@@ -295,15 +299,18 @@ describe("calculateEnergySavings", () => {
     expect(calculateEnergySavings(usageProfile)).toEqual(0);
   });
 
-  it("should handle invalid initial state gracefully", () => {
+  it("should throw an error for an invalid initial state", () => {
     const usageProfile11 = {
       initial: "invalid-state",
       events: [],
     };
-    expect(calculateEnergySavings(usageProfile11)).toEqual(undefined);
+
+    expect(() => calculateEnergySavings(usageProfile11)).toThrow(
+      "Invalid profile: initial state must be one of on, off, auto-off."
+    );
   });
 
-  it("should handle negative or invalid timestamps gracefully", () => {
+  it("should throw an error for negative or invalid timestamps", () => {
     const usageProfile12 = {
       initial: "off",
       events: [
@@ -311,7 +318,10 @@ describe("calculateEnergySavings", () => {
         { timestamp: 500, state: "off" },
       ],
     };
-    expect(calculateEnergySavings(usageProfile12)).toEqual(undefined);
+
+    expect(() => calculateEnergySavings(usageProfile12)).toThrow(
+      "Invalid event: timestamp must be a number between 0 and 1440."
+    );
   });
 });
 
@@ -540,12 +550,18 @@ describe("calculateEnergyUsageForDay", () => {
         MAX_IN_PERIOD * 3 - 4000
       );
     });
-    it("should return undefined for invalid month profile input", () => {
-      expect(
+    it("should throw an error for invalid month profile input", () => {
+      expect(() =>
         calculateEnergyUsageForDay({ initial: "invalid", events: [] }, 3)
-      ).toBeUndefined();
-      expect(calculateEnergyUsageForDay({ initial: "on" }, 3)).toBeUndefined();
-      expect(calculateEnergyUsageForDay({ events: [] }, 3)).toBeUndefined();
+      ).toThrow("Invalid profile: initial state must be one of on, off.");
+
+      expect(() => calculateEnergyUsageForDay({ initial: "on" }, 3)).toThrow(
+        "Invalid profile: must include an array of events."
+      );
+
+      expect(() => calculateEnergyUsageForDay({ events: [] }, 3)).toThrow(
+        "Invalid profile: initial state must be one of on, off."
+      );
     });
   });
 });
