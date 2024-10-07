@@ -3,6 +3,12 @@ const {
   calculateEnergySavings,
   calculateEnergyUsageForDay,
   MAX_IN_PERIOD,
+  VALID_STATES,
+  VALID_STATES_SIMPLE,
+  INVALID_EVENTS_ERROR,
+  INVALID_EVENT_TIMESTAMP_ERROR,
+  INVALID_PROFILE_ERROR,
+  INVALID_STATE_ERROR,
 } = require("./index");
 
 // Part 1
@@ -136,7 +142,7 @@ describe("calculateEnergyUsageSimple", () => {
       events: [],
     };
     expect(() => calculateEnergySavings(usageProfile11)).toThrow(
-      "Invalid profile: initial state must be one of on, off, auto-off."
+      INVALID_STATE_ERROR(VALID_STATES)
     );
   });
 
@@ -149,8 +155,39 @@ describe("calculateEnergyUsageSimple", () => {
       ],
     };
     expect(() => calculateEnergyUsageSimple(usageProfile12)).toThrow(
-      "Invalid event: timestamp must be a number between 0 and 1440."
+      INVALID_EVENT_TIMESTAMP_ERROR
     );
+  });
+
+  it("should throw an error for timestamp out of range (above 1439)", () => {
+    const usageProfile = {
+      initial: "off",
+      events: [{ timestamp: 1441, state: "on" }],
+    };
+    expect(() => calculateEnergyUsageSimple(usageProfile)).toThrow(
+      INVALID_EVENT_TIMESTAMP_ERROR
+    );
+  });
+
+  it("should throw an error for invalid event state", () => {
+    const usageProfile = {
+      initial: "on",
+      events: [{ timestamp: 500, state: "invalid-state" }],
+    };
+    expect(() => calculateEnergyUsageSimple(usageProfile)).toThrow(
+      INVALID_STATE_ERROR(VALID_STATES_SIMPLE)
+    );
+  });
+
+  it("should throw an error if profile is not an object", () => {
+    // Test with various non-object types
+    const invalidProfiles = [null, undefined, 123, "string", [], true];
+    invalidProfiles.forEach((invalidProfile) => {
+      console.log(invalidProfile);
+      expect(() => calculateEnergyUsageSimple(invalidProfile)).toThrow(
+        INVALID_PROFILE_ERROR
+      );
+    });
   });
 });
 
@@ -306,7 +343,7 @@ describe("calculateEnergySavings", () => {
     };
 
     expect(() => calculateEnergySavings(usageProfile11)).toThrow(
-      "Invalid profile: initial state must be one of on, off, auto-off."
+      INVALID_STATE_ERROR(VALID_STATES)
     );
   });
 
@@ -320,7 +357,17 @@ describe("calculateEnergySavings", () => {
     };
 
     expect(() => calculateEnergySavings(usageProfile12)).toThrow(
-      "Invalid event: timestamp must be a number between 0 and 1440."
+      INVALID_EVENT_TIMESTAMP_ERROR
+    );
+  });
+
+  it("should throw an error for invalid initial state", () => {
+    const usageProfile = {
+      initial: "invalid-state",
+      events: [],
+    };
+    expect(() => calculateEnergySavings(usageProfile)).toThrow(
+      INVALID_STATE_ERROR(VALID_STATES)
     );
   });
 });
@@ -412,156 +459,150 @@ describe("calculateEnergyUsageForDay", () => {
     );
   });
 
-  describe("calculateEnergyUsageForDay - Edge Cases", () => {
-    it("should handle no events before the specified day", () => {
-      const monthProfile = { initial: "off", events: [] };
-      expect(calculateEnergyUsageForDay(monthProfile, 5)).toEqual(0);
-    });
+  it("should throw an error for an empty profile object", () => {
+    expect(() => calculateEnergyUsageForDay({}, 1)).toThrow(
+      INVALID_EVENTS_ERROR
+    );
+  });
 
-    it("should handle no events on the specified day", () => {
-      const monthProfile = {
-        initial: "on",
-        events: [
-          { state: "off", timestamp: 1000 }, // Day 1
-          { state: "on", timestamp: 2000 }, // Day 2
-          { state: "off", timestamp: 5000 }, // After Day 3
-        ],
-      };
-      expect(calculateEnergyUsageForDay(monthProfile, 3)).toEqual(
-        MAX_IN_PERIOD
-      );
-    });
+  it("should handle no events before the specified day", () => {
+    const monthProfile = { initial: "off", events: [] };
+    expect(calculateEnergyUsageForDay(monthProfile, 5)).toEqual(0);
+  });
 
-    it("should handle an event occurring at the exact start of the day", () => {
-      const monthProfile = {
-        initial: "on",
-        events: [
-          { state: "off", timestamp: MAX_IN_PERIOD * 2 }, // Day 3 start
-          { state: "on", timestamp: 3000 },
-        ],
-      };
-      expect(calculateEnergyUsageForDay(monthProfile, 3)).toEqual(
-        MAX_IN_PERIOD * 3 - 3000
-      );
-    });
+  it("should handle no events on the specified day", () => {
+    const monthProfile = {
+      initial: "on",
+      events: [
+        { state: "off", timestamp: 1000 }, // Day 1
+        { state: "on", timestamp: 2000 }, // Day 2
+        { state: "off", timestamp: 5000 }, // After Day 3
+      ],
+    };
+    expect(calculateEnergyUsageForDay(monthProfile, 3)).toEqual(MAX_IN_PERIOD);
+  });
 
-    it("should handle an event occurring at the exact end of the day", () => {
-      const monthProfile = {
-        initial: "on",
-        events: [
-          { state: "off", timestamp: 4319 }, // Last minute of Day 3
-          { state: "on", timestamp: 5000 },
-        ],
-      };
-      expect(calculateEnergyUsageForDay(monthProfile, 3)).toEqual(
-        4319 - MAX_IN_PERIOD * 2
-      );
-    });
+  it("should handle an event occurring at the exact start of the day", () => {
+    const monthProfile = {
+      initial: "on",
+      events: [
+        { state: "off", timestamp: MAX_IN_PERIOD * 2 }, // Day 3 start
+        { state: "on", timestamp: 3000 },
+      ],
+    };
+    expect(calculateEnergyUsageForDay(monthProfile, 3)).toEqual(
+      MAX_IN_PERIOD * 3 - 3000
+    );
+  });
 
-    it("should handle the first event of the month occurring after several days", () => {
-      const monthProfile = {
-        initial: "off",
-        events: [
-          { state: "on", timestamp: MAX_IN_PERIOD * 4 }, // Start of Day 5
-        ],
-      };
-      expect(calculateEnergyUsageForDay(monthProfile, 1)).toEqual(0);
-      expect(calculateEnergyUsageForDay(monthProfile, 4)).toEqual(0);
-      expect(calculateEnergyUsageForDay(monthProfile, 5)).toEqual(
-        MAX_IN_PERIOD
-      );
-    });
+  it("should handle an event occurring at the exact end of the day", () => {
+    const monthProfile = {
+      initial: "on",
+      events: [
+        { state: "off", timestamp: 4319 }, // Last minute of Day 3
+        { state: "on", timestamp: 5000 },
+      ],
+    };
+    expect(calculateEnergyUsageForDay(monthProfile, 3)).toEqual(
+      4319 - MAX_IN_PERIOD * 2
+    );
+  });
 
-    it("should handle multiple events occurring in the same minute", () => {
-      const monthProfile = {
-        initial: "off",
-        events: [
-          { state: "on", timestamp: 1500 },
-          { state: "off", timestamp: 1500 },
-          { state: "on", timestamp: 2500 },
-        ],
-      };
-      expect(calculateEnergyUsageForDay(monthProfile, 2)).toEqual(
-        MAX_IN_PERIOD * 2 - 2500
-      );
-    });
+  it("should handle the first event of the month occurring after several days", () => {
+    const monthProfile = {
+      initial: "off",
+      events: [
+        { state: "on", timestamp: MAX_IN_PERIOD * 4 }, // Start of Day 5
+      ],
+    };
+    expect(calculateEnergyUsageForDay(monthProfile, 1)).toEqual(0);
+    expect(calculateEnergyUsageForDay(monthProfile, 4)).toEqual(0);
+    expect(calculateEnergyUsageForDay(monthProfile, 5)).toEqual(MAX_IN_PERIOD);
+  });
 
-    it("should handle all events in a single day", () => {
-      const monthProfile = {
-        initial: "off",
-        events: [
-          { state: "on", timestamp: MAX_IN_PERIOD }, // Day 2
-          { state: "off", timestamp: 2000 },
-          { state: "on", timestamp: 2500 },
-        ],
-      };
-      expect(calculateEnergyUsageForDay(monthProfile, 2)).toEqual(
-        2000 - MAX_IN_PERIOD + (MAX_IN_PERIOD * 2 - 2500)
-      );
-    });
+  it("should handle multiple events occurring in the same minute", () => {
+    const monthProfile = {
+      initial: "off",
+      events: [
+        { state: "on", timestamp: 1500 },
+        { state: "off", timestamp: 1500 },
+        { state: "on", timestamp: 2500 },
+      ],
+    };
+    expect(calculateEnergyUsageForDay(monthProfile, 2)).toEqual(
+      MAX_IN_PERIOD * 2 - 2500
+    );
+  });
 
-    it("should handle events exactly at each day’s midnight", () => {
-      const monthProfile = {
-        initial: "on",
-        events: [
-          { state: "off", timestamp: MAX_IN_PERIOD }, // Start of Day 2
-          { state: "on", timestamp: MAX_IN_PERIOD * 2 }, // Start of Day 3
-          { state: "off", timestamp: MAX_IN_PERIOD * 3 }, // Start of Day 4
-        ],
-      };
-      expect(calculateEnergyUsageForDay(monthProfile, 2)).toEqual(0);
-      expect(calculateEnergyUsageForDay(monthProfile, 3)).toEqual(
-        MAX_IN_PERIOD
-      );
-    });
+  it("should handle all events in a single day", () => {
+    const monthProfile = {
+      initial: "off",
+      events: [
+        { state: "on", timestamp: MAX_IN_PERIOD }, // Day 2
+        { state: "off", timestamp: 2000 },
+        { state: "on", timestamp: 2500 },
+      ],
+    };
+    expect(calculateEnergyUsageForDay(monthProfile, 2)).toEqual(
+      2000 - MAX_IN_PERIOD + (MAX_IN_PERIOD * 2 - 2500)
+    );
+  });
 
-    it("should handle continuous usage without any off events", () => {
-      const monthProfile = {
-        initial: "on",
-        events: [],
-      };
-      expect(calculateEnergyUsageForDay(monthProfile, 1)).toEqual(
-        MAX_IN_PERIOD
-      );
-      expect(calculateEnergyUsageForDay(monthProfile, 2)).toEqual(
-        MAX_IN_PERIOD
-      );
-    });
+  it("should handle events exactly at each day’s midnight", () => {
+    const monthProfile = {
+      initial: "on",
+      events: [
+        { state: "off", timestamp: MAX_IN_PERIOD }, // Start of Day 2
+        { state: "on", timestamp: MAX_IN_PERIOD * 2 }, // Start of Day 3
+        { state: "off", timestamp: MAX_IN_PERIOD * 3 }, // Start of Day 4
+      ],
+    };
+    expect(calculateEnergyUsageForDay(monthProfile, 2)).toEqual(0);
+    expect(calculateEnergyUsageForDay(monthProfile, 3)).toEqual(MAX_IN_PERIOD);
+  });
 
-    it("should handle random events scattered across the month", () => {
-      const monthProfile = {
-        initial: "off",
-        events: [
-          { state: "on", timestamp: 1300 }, // Day 1
-          { state: "off", timestamp: 2500 }, // Day 2
-          { state: "on", timestamp: 4000 }, // Day 3
-          { state: "off", timestamp: 5000 }, // Day 4
-          { state: "on", timestamp: 7000 }, // Day 5
-          { state: "off", timestamp: 7500 }, // Day 5
-        ],
-      };
-      expect(calculateEnergyUsageForDay(monthProfile, 1)).toEqual(
-        MAX_IN_PERIOD - 1300
-      );
-      expect(calculateEnergyUsageForDay(monthProfile, 2)).toEqual(
-        2500 - MAX_IN_PERIOD
-      );
-      expect(calculateEnergyUsageForDay(monthProfile, 3)).toEqual(
-        MAX_IN_PERIOD * 3 - 4000
-      );
-    });
-    it("should throw an error for invalid month profile input", () => {
-      expect(() =>
-        calculateEnergyUsageForDay({ initial: "invalid", events: [] }, 3)
-      ).toThrow("Invalid profile: initial state must be one of on, off.");
+  it("should handle continuous usage without any off events", () => {
+    const monthProfile = {
+      initial: "on",
+      events: [],
+    };
+    expect(calculateEnergyUsageForDay(monthProfile, 1)).toEqual(MAX_IN_PERIOD);
+    expect(calculateEnergyUsageForDay(monthProfile, 2)).toEqual(MAX_IN_PERIOD);
+  });
 
-      expect(() => calculateEnergyUsageForDay({ initial: "on" }, 3)).toThrow(
-        "Invalid profile: must include an array of events."
-      );
+  it("should handle random events scattered across the month", () => {
+    const monthProfile = {
+      initial: "off",
+      events: [
+        { state: "on", timestamp: 1300 }, // Day 1
+        { state: "off", timestamp: 2500 }, // Day 2
+        { state: "on", timestamp: 4000 }, // Day 3
+        { state: "off", timestamp: 5000 }, // Day 4
+        { state: "on", timestamp: 7000 }, // Day 5
+        { state: "off", timestamp: 7500 }, // Day 5
+      ],
+    };
+    expect(calculateEnergyUsageForDay(monthProfile, 1)).toEqual(
+      MAX_IN_PERIOD - 1300
+    );
+    expect(calculateEnergyUsageForDay(monthProfile, 2)).toEqual(
+      2500 - MAX_IN_PERIOD
+    );
+    expect(calculateEnergyUsageForDay(monthProfile, 3)).toEqual(
+      MAX_IN_PERIOD * 3 - 4000
+    );
+  });
+  it("should throw an error for invalid month profile input", () => {
+    expect(() =>
+      calculateEnergyUsageForDay({ initial: "invalid", events: [] }, 3)
+    ).toThrow(INVALID_STATE_ERROR(VALID_STATES_SIMPLE));
 
-      expect(() => calculateEnergyUsageForDay({ events: [] }, 3)).toThrow(
-        "Invalid profile: initial state must be one of on, off."
-      );
-    });
+    expect(() => calculateEnergyUsageForDay({ initial: "on" }, 3)).toThrow(
+      INVALID_EVENTS_ERROR
+    );
+
+    expect(() => calculateEnergyUsageForDay({ events: [] }, 3)).toThrow(
+      INVALID_STATE_ERROR(VALID_STATES_SIMPLE)
+    );
   });
 });
