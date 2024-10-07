@@ -39,9 +39,9 @@ const VALID_STATES = ["on", "off", "auto-off"];
  */
 
 // Validation for individual events
-const isEventValidSimple = (event) =>
+const isEventValid = (event, validStates) =>
   typeof event.timestamp === "number" &&
-  VALID_STATES_SIMPLE.includes(event.state) &&
+  validStates.includes(event.state) &&
   event.timestamp >= 0 &&
   event.timestamp <= MAX_IN_PERIOD;
 
@@ -61,7 +61,7 @@ const calculateEnergyUsageSimple = (profile) => {
   let isOn = profile.initial === "on";
 
   for (let event of profile.events) {
-    if (!isEventValidSimple(event)) {
+    if (!isEventValid(event, VALID_STATES_SIMPLE)) {
       return undefined;
     }
 
@@ -112,30 +112,23 @@ const calculateEnergyUsageSimple = (profile) => {
  * and not manual intervention.
  */
 
-// Validation for individual events with auto-off
-const isEventValid = (event) =>
-  typeof event.timestamp === "number" &&
-  VALID_STATES.includes(event.state) &&
-  event.timestamp >= 0 &&
-  event.timestamp <= MAX_IN_PERIOD;
-
 const calculateEnergySavings = (profile) => {
   if (!isProfileValid(profile, VALID_STATES)) {
     return undefined;
   }
 
-  let energySaved = 0;
+  let totalEnergySaved = 0;
   let isOn = profile.initial === "on";
   let autoOffTriggered = profile.initial === "auto-off";
   let autoOffTimestamp = 0;
 
   for (let event of profile.events) {
-    if (!isEventValid(event)) {
+    if (!isEventValid(event, VALID_STATES)) {
       return undefined;
     }
 
     if (autoOffTriggered && event.state === "on") {
-      energySaved += event.timestamp - autoOffTimestamp;
+      totalEnergySaved += event.timestamp - autoOffTimestamp;
       autoOffTriggered = false;
     }
 
@@ -148,10 +141,10 @@ const calculateEnergySavings = (profile) => {
   }
 
   if (autoOffTriggered) {
-    energySaved += MAX_IN_PERIOD - autoOffTimestamp;
+    totalEnergySaved += MAX_IN_PERIOD - autoOffTimestamp;
   }
 
-  return energySaved;
+  return totalEnergySaved;
 };
 
 /**
@@ -180,6 +173,7 @@ const calculateEnergySavings = (profile) => {
  * been given for the month.
  */
 
+const isInteger = (number) => Number.isInteger(number);
 // Validate the day input
 const validateDay = (day) => {
   if (!isInteger(day)) {
