@@ -1,6 +1,8 @@
 /* The maximum number of minutes in a period (a day) */
 
 const MAX_IN_PERIOD = 1440;
+const VALID_STATES_SIMPLE = ["on", "off"];
+const VALID_STATES = ["on", "off", "auto-off"];
 
 /**
  * PART 1
@@ -36,34 +38,40 @@ const MAX_IN_PERIOD = 1440;
  * ```
  */
 
+// Validation for individual events
+const isEventValidSimple = (event) =>
+  typeof event.timestamp === "number" &&
+  VALID_STATES_SIMPLE.includes(event.state) &&
+  event.timestamp >= 0 &&
+  event.timestamp <= MAX_IN_PERIOD;
+
+// Validation for the overall profile
+const isProfileValid = (profile, validStates) =>
+  profile &&
+  Array.isArray(profile.events) &&
+  validStates.includes(profile.initial);
+
 const calculateEnergyUsageSimple = (profile) => {
-  if (
-    !profile ||
-    !Array.isArray(profile.events) ||
-    typeof profile.initial !== 'string'
-  ) {
-    return 0;
+  if (!isProfileValid(profile, VALID_STATES_SIMPLE)) {
+    return undefined;
   }
 
   let totalEnergy = 0;
   let previousTimestamp = 0;
-  let isOn = profile.initial === 'on';
+  let isOn = profile.initial === "on";
 
-  profile.events.forEach((event) => {
-    if (
-      typeof event.timestamp !== 'number' ||
-      !['on', 'off'].includes(event.state)
-    ) {
-      return 0;
+  for (let event of profile.events) {
+    if (!isEventValidSimple(event)) {
+      return undefined;
     }
 
     if (isOn) {
       totalEnergy += event.timestamp - previousTimestamp;
     }
 
-    isOn = event.state === 'on';
+    isOn = event.state === "on";
     previousTimestamp = event.timestamp;
-  });
+  }
 
   if (isOn) {
     totalEnergy += MAX_IN_PERIOD - previousTimestamp;
@@ -71,6 +79,7 @@ const calculateEnergyUsageSimple = (profile) => {
 
   return totalEnergy;
 };
+
 /**
  * PART 2
  *
@@ -103,7 +112,47 @@ const calculateEnergyUsageSimple = (profile) => {
  * and not manual intervention.
  */
 
-const calculateEnergySavings = (profile) => {};
+// Validation for individual events with auto-off
+const isEventValid = (event) =>
+  typeof event.timestamp === "number" &&
+  VALID_STATES.includes(event.state) &&
+  event.timestamp >= 0 &&
+  event.timestamp <= MAX_IN_PERIOD;
+
+const calculateEnergySavings = (profile) => {
+  if (!isProfileValid(profile, VALID_STATES)) {
+    return undefined;
+  }
+
+  let energySaved = 0;
+  let isOn = profile.initial === "on";
+  let autoOffTriggered = profile.initial === "auto-off";
+  let autoOffTimestamp = 0;
+
+  for (let event of profile.events) {
+    if (!isEventValid(event)) {
+      return undefined;
+    }
+
+    if (autoOffTriggered && event.state === "on") {
+      energySaved += event.timestamp - autoOffTimestamp;
+      autoOffTriggered = false;
+    }
+
+    if (event.state === "auto-off" && isOn) {
+      autoOffTriggered = true;
+      autoOffTimestamp = event.timestamp;
+    }
+
+    isOn = event.state === "on";
+  }
+
+  if (autoOffTriggered) {
+    energySaved += MAX_IN_PERIOD - autoOffTimestamp;
+  }
+
+  return energySaved;
+};
 
 /**
  * PART 3
@@ -131,9 +180,49 @@ const calculateEnergySavings = (profile) => {};
  * been given for the month.
  */
 
-const isInteger = (number) => Number.isInteger(number);
+// Validate the day input
+const validateDay = (day) => {
+  if (!isInteger(day)) {
+    throw new Error("must be an integer");
+  }
+  if (day < 1 || day > 365) {
+    throw new Error("day out of range");
+  }
+};
 
-const calculateEnergyUsageForDay = (monthUsageProfile, day) => {};
+// Calculate the initial state for a specific day
+const getInitialStateForDay = (monthUsageProfile, dayStart) => {
+  let initialState = monthUsageProfile.initial;
+  for (let event of monthUsageProfile.events) {
+    if (event.timestamp >= dayStart) break;
+    initialState = event.state;
+  }
+  return initialState;
+};
+
+const calculateEnergyUsageForDay = (monthUsageProfile, day) => {
+  if (!isProfileValid(monthUsageProfile, VALID_STATES_SIMPLE)) {
+    return undefined;
+  }
+  validateDay(day);
+
+  const dayStart = (day - 1) * MAX_IN_PERIOD;
+  const dayEnd = day * MAX_IN_PERIOD - 1;
+
+  const dayEvents = monthUsageProfile.events
+    .filter((event) => event.timestamp >= dayStart && event.timestamp <= dayEnd)
+    .map((event) => ({
+      state: event.state,
+      timestamp: event.timestamp - dayStart,
+    }));
+
+  const initialState = getInitialStateForDay(monthUsageProfile, dayStart);
+
+  return calculateEnergyUsageSimple({
+    initial: initialState,
+    events: dayEvents,
+  });
+};
 
 module.exports = {
   calculateEnergyUsageSimple,
