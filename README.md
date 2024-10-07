@@ -1,41 +1,18 @@
-## Welcome!
+### Description
+This PR includes my solution for the three-part coding exercise. The primary focus areas were:
 
-This exercise is divided into three parts - we expect that you'd be able to get through Part 1,
-and then either Part 2 or Part 3, or both. Note that you don't strictly need to do part 2 or 3 in order,
-but they do build on the exercise in Part 1.
+- **Part 1**: Calculated the total energy usage of an appliance based on its on/off events across a day.
+- **Part 2**: Extended the calculation to account for energy savings using an energy-saving device that automatically powers off the appliance after inactivity.
+- **Part 3**: Calculated energy usage for specific days in a multi-day profile, accommodating arbitrary start and end times for each day.
 
-We're not interested in esoteric JavaScript or development tool knowledge, but rather to see how you
-structure your code. Things like:
-- Understandability and maintainability
-- Good programming habits
-- Code style
-- Attention to detail
+### Key Highlights
+- **Code Structure**: Focused on readability, modularity, and maintainability for easy future updates and testing.
+- **Validation and Edge Cases**: Included comprehensive input validation and handled edge cases as described in the prompt.
+- **Testing**: Implemented extensive tests to ensure each function's reliability, covering standard and edge cases.
+- **Documentation**: Each function includes inline comments and JSDoc annotations for clarity and context.
 
+### How to test
+- **To Run**: Use `npm install` to install dependencies and `npm test` to run the test suite.
+- **Format**: Code is formatted according with `npm run format`.
 
-You are welcome to draw on any other resources you may need to get started with Node.js,
-format your code or to check syntax.(The exercise is meant to be realistic in that you can
-use documentation and tools as needed to complete your work to a professional standard).
-
-
-## Getting Started
-1. Install [node.js](https://nodejs.org/en/download/).
-2. In the project directory, run `npm install` to install the dependencies e.g.:
-```sh
-cd questions
-npm install
-```
-3. Run the tests with `npm test` to validate your working. **The goal is to get
-all the tests passing.**
-
-You shouldn't not need to modify the tests, but feel free to add new tests to help you complete the
-challenge or improve the validation - we might have missed a scenario!
-
-You can also run the tests in 'watch' (continuous update mode) with:
-```sh
-npm run test:watch
-```
-
-## Submitting the challenge
-1. Ensure you've formatted your code using `npm run format` before submission.
-2. Raise a PR in this repository with your solution.
-3. Send us an email, and we'll set up a time and go through your answers, either over a video-call or in-person.
+Please let me know if there are any questions or additional adjustments required. Looking forward to your feedback!
